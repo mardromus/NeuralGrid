@@ -6,17 +6,29 @@ import { Wallet } from "lucide-react";
 export function WalletSelector() {
     const { connect, disconnect, account, connected, wallets } = useWallet();
 
-    const handleConnect = () => {
-        // For MVP, just connect to the first available wallet (usually Petra)
-        const petra = wallets.find(w => w.name === "Petra");
-        if (petra) {
-            connect(petra.name);
-        } else {
-            // If wallet not found, could prompt install. 
-            // For now, assume Petra is available or let adapter handle it if UI was using standard modal.
-            // But since we are building custom button:
-            if (wallets.length > 0) connect(wallets[0].name);
-            else window.open("https://petra.app/", "_blank");
+    const handleConnect = async () => {
+        try {
+            // For MVP, just connect to the first available wallet (usually Petra)
+            const petra = wallets.find(w => w.name === "Petra");
+            if (petra) {
+                await connect(petra.name);
+            } else {
+                // If wallet not found, could prompt install
+                if (wallets.length > 0) {
+                    await connect(wallets[0].name);
+                } else {
+                    window.open("https://petra.app/", "_blank");
+                }
+            }
+        } catch (error) {
+            // Silently suppress "wallet already connected" errors
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            if (errorMessage.toLowerCase().includes('already connected')) {
+                // Wallet is already connected, ignore
+                return;
+            }
+            // Only log unexpected errors
+            console.error('Wallet connection error:', error);
         }
     };
 

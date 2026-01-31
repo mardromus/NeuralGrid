@@ -22,6 +22,7 @@ export default function PublishPage() {
     const [isMinting, setIsMinting] = useState(false);
 
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<AgentFormData>({
+        // @ts-ignore - zod resolver type inference issue
         resolver: zodResolver(agentSchema),
         defaultValues: {
             name: "",

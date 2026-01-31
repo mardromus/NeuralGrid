@@ -8,18 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Terminal, Play, CheckCircle, AlertCircle, Loader2, ArrowLeft, BrainCircuit, ShieldCheck, Lock, Unlock, Coins } from 'lucide-react';
+import { Terminal, CheckCircle, AlertCircle, ArrowLeft, BrainCircuit, ShieldCheck, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useWallet } from '@aptos-labs/wallet-adapter-react';
-import { fetchWithPayment } from '@/lib/x402';
 import { toast } from 'sonner';
-import { KernelMonitor } from '@/components/KernelMonitor';
 import { SwarmGraph } from '@/components/SwarmGraph';
+import { PaymentModal } from '@/components/PaymentModal';
 
 interface LogEntry {
     timestamp: string;
     message: string;
-    type: 'info' | 'success' | 'error' | 'warning' | 'escrow';
+    type: 'info' | 'success' | 'error' | 'warning' | 'payment';
 }
 
 export default function AgentDetailsPage() {
@@ -28,11 +27,9 @@ export default function AgentDetailsPage() {
     const wallet = useWallet();
     const [agent, setAgent] = useState(agents.find(a => a.id === params.id));
     const [logs, setLogs] = useState<LogEntry[]>([]);
-    const [outputData, setOutputData] = useState<{ type: string, content: string } | null>(null);
-
-    // Escrow State Machine
-    const [escrowStatus, setEscrowStatus] = useState<'idle' | 'depositing' | 'locked' | 'execution' | 'releasing' | 'complete'>('idle');
-    const [isVerified, setIsVerified] = useState(false);
+    const [outputData, setOutputData] = useState<{ type: string, content: any } | null>(null);
+    const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+    const [taskParams, setTaskParams] = useState<any>({});
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Refresh agent if store loads later or changes
@@ -59,102 +56,79 @@ export default function AgentDetailsPage() {
         }
     }, [logs]);
 
-    const handleHireFlow = async () => {
+    const handleExecuteAgent = () => {
         if (!agent) return;
         if (!wallet.connected) {
-            toast.error("connect_wallet_required");
+            toast.error("Please connect your wallet first");
             addLog("Execution Aborted: Wallet connection required.", "error");
             return;
         }
 
         // Reset State
-        setIsVerified(false);
         setLogs([]);
-        setOutputData(null); // Clear previous output
-        setEscrowStatus('depositing');
+        setOutputData(null);
 
-        // Determine Capability based on Agent Category (Hackathon Logic)
-        let capability = 'finance';
-        if (agent.category?.toLowerCase().includes('forge') || agent.name.includes("VORTEX")) capability = 'visual';
-        if (agent.category?.toLowerCase().includes('logic') || agent.name.includes("DEEP")) capability = 'audit';
+        // Determine task type based on agent category
+        let taskType = 'financial-analysis';
+        let params: any = { symbol: 'APT' };
 
-        // 1. Escrow Deposit Phase
-        addLog("Initiating Aether Service Escrow...", "info");
-        addLog(`Contract: ${agent.onChainData?.registryId || "0x1::aether_escrow"}`, "info");
-
-        try {
-            await new Promise(r => setTimeout(r, 1500)); // Simulate Wallet Signature
-            addLog(`Delegating ${agent.price} APT to Escrow Vault...`, "escrow");
-            await new Promise(r => setTimeout(r, 1000)); // Simulate Chain Confirmation
-
-            setEscrowStatus('locked');
-            addLog("Funds Locked. ID: 0x" + Math.random().toString(16).slice(2, 10), "success");
-            toast.success("Funds Escrowed Successfully");
-
-            // 2. Execution Phase
-            setEscrowStatus('execution');
-            addLog(`Signaling Agent: ${agent.endpoint}`, "info");
-
-            // Call the API (Simulated or Real)
-            const res = await fetchWithPayment(agent.endpoint, {
-                method: "POST",
-                body: JSON.stringify({
-                    prompt: "Execute assigned task per protocol spec.",
-                    capability: capability
-                })
-            }, wallet);
-
-            if (res.ok) {
-                const data = await res.json();
-
-                // Stream Logs
-                if (data.logs && Array.isArray(data.logs)) {
-                    for (const log of data.logs) {
-                        addLog(log, "info");
-                        await new Promise(r => setTimeout(r, 400));
-                    }
-                }
-
-                addLog("Task Output Generated.", "success");
-
-                // Handle Rich Output
-                setOutputData({
-                    type: data.outputType || 'text',
-                    content: data.output
-                });
-
-                // 3. Settlement Phase
-                setEscrowStatus('releasing');
-                addLog("Verifying Proof of Compute...", "escrow");
-                await new Promise(r => setTimeout(r, 1500)); // Simulate Verification
-
-                setIsVerified(true);
-                setEscrowStatus('complete');
-                addLog("Proof Valid. Releasing Funds to Agent.", "success");
-                addLog("Reputation Score Updated.", "success");
-                toast.success("Task Complete & Settled");
-
-            } else {
-                throw new Error(`Agent API returned ${res.status}`);
-            }
-
-        } catch (error: any) {
-            console.error("Execution Error:", error);
-
-            // Extract the most useful error message
-            const errorMessage = error?.message || String(error);
-            addLog(`FAILURE: ${errorMessage}`, "error");
-
-            // Show detailed toast for debugging
-            toast.error("Transaction Failed", {
-                description: errorMessage.substring(0, 100) // Limit length
-            });
-
-            setEscrowStatus('idle'); // Reset or Error State
-            if (escrowStatus === 'locked') {
-                addLog("Triggering Emergency Refund...", "warning");
-            }
+        if (agent.category?.toLowerCase().includes('forge') || agent.name.includes("VORTEX")) {
+            taskType = 'image-generation';
+            params = { prompt: 'A futuristic AI agent in a cyberpunk city' };
+        } else if (agent.category?.toLowerCase().includes('logic') || agent.name.includes("DEEP")) {
+            taskType = 'code-audit';
+            params = { code: 'function transfer(address to, uint amount) { balances[to] += amount; }' };
         }
+
+        setTaskParams(params);
+        addLog(`Initializing x402 payment protocol...`, "info");
+        addLog(`Task: ${taskType}`, "info");
+
+        // Open payment modal
+        setIsPaymentModalOpen(true);
+    };
+
+    const handlePaymentSuccess = (result: any) => {
+        addLog(`Payment confirmed! Transaction: ${result.payment?.transactionHash}`, "payment");
+        addLog(`Agent execution completed in ${result.executionTime}ms`, "success");
+        addLog(`Cost: ${result.cost} Octas`, "payment");
+
+        // Save to transaction history
+        if (result.payment?.transactionHash) {
+            import("@/lib/x402/history").then(({ saveTransaction }) => {
+                saveTransaction({
+                    id: `tx-${Date.now()}`,
+                    txnHash: result.payment.transactionHash,
+                    agentId: id,
+                    agentName: agent.name,
+                    taskType: agent.category,
+                    parameters: {},
+                    cost: result.cost || "0",
+                    costAPT: agent.price,
+                    result: result.result,
+                    timestamp: Date.now(),
+                    executionTime: result.executionTime || 0,
+                    status: "success",
+                    blockHeight: result.payment.blockHeight
+                });
+                addLog("✅ Transaction saved to history", "success");
+            }).catch(console.error);
+        }
+
+        // Set output data based on result type
+        if (result.result) {
+            const resultType = result.result.type || 'text';
+            setOutputData({
+                type: resultType,
+                content: resultType === 'image' ? result.result.url :
+                    resultType === 'audit-report' ? JSON.stringify(result.result, null, 2) :
+                        resultType === 'financial-data' ? JSON.stringify(result.result, null, 2) :
+                            result.result
+            });
+        }
+
+        toast.success("Task completed successfully!");
+        setIsPaymentModalOpen(false);
     };
 
     if (!agent) {
@@ -210,27 +184,18 @@ export default function AgentDetailsPage() {
                                 <span className="text-primary font-bold">{agent.onChainData?.reputationScore || agent.reputation}/1000</span>
                             </div>
 
-                            {/* Escrow Action Button */}
+                            {/* x402 Payment Button */}
                             <Button
-                                className={`w-full font-bold shadow-lg transition-all h-12 text-sm
-                                    ${escrowStatus === 'idle' ? 'bg-primary text-black hover:bg-cyan-400' :
-                                        escrowStatus === 'complete' ? 'bg-green-500 text-black' : 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/50'}`}
-                                onClick={handleHireFlow}
-                                disabled={escrowStatus !== 'idle' && escrowStatus !== 'complete'}
+                                className="w-full bg-primary hover:bg-cyan-400 text-black font-bold shadow-[0_0_15px_rgba(14,165,233,0.2)] hover:shadow-[0_0_25px_rgba(14,165,233,0.5)] transition-all h-12"
+                                onClick={handleExecuteAgent}
                             >
-                                {escrowStatus === 'idle' && <><Lock className="w-4 h-4 mr-2" /> HIRE AGENT (ESCROW)</>}
-                                {escrowStatus === 'depositing' && <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> SIGNING...</>}
-                                {escrowStatus === 'locked' && <><Lock className="w-4 h-4 mr-2" /> FUNDS LOCKED</>}
-                                {escrowStatus === 'execution' && <><Play className="w-4 h-4 mr-2 animate-pulse" /> AGENT WORKING...</>}
-                                {escrowStatus === 'releasing' && <><Coins className="w-4 h-4 mr-2 animate-bounce" /> RELEASING PAY...</>}
-                                {escrowStatus === 'complete' && <><CheckCircle className="w-4 h-4 mr-2" /> TASK COMPLETE</>}
+                                <Zap className="w-4 h-4 mr-2 fill-current" />
+                                EXECUTE WITH x402
                             </Button>
 
-                            {escrowStatus !== 'idle' && (
-                                <div className="text-[10px] text-center font-mono text-muted-foreground animate-pulse">
-                                    Trustless Escrow Contract Interaction
-                                </div>
-                            )}
+                            <div className="text-[10px] text-center font-mono text-muted-foreground">
+                                Pay-per-request micropayment • Sub-second settlement
+                            </div>
                         </div>
                     </Card>
 
@@ -272,38 +237,19 @@ export default function AgentDetailsPage() {
                         <CardContent className="flex-1 p-0 relative">
                             <ScrollArea className="h-[600px] w-full p-4 font-mono text-sm" ref={scrollRef}>
                                 <div className="min-h-full">
-                                    {logs.length === 0 && escrowStatus === 'idle' && (
+                                    {logs.length === 0 && (
                                         <div className="h-[500px] flex flex-col items-center justify-center text-muted-foreground/30 space-y-4">
                                             <BrainCircuit className="w-24 h-24 opacity-20 animate-pulse" />
                                             <p className="font-mono text-center">
                                                 Awaiting Neural Link...<br />
-                                                <span className="text-xs opacity-50">Secure Enclave Ready</span>
+                                                <span className="text-xs opacity-50">x402 Protocol Ready</span>
                                             </p>
                                         </div>
                                     )}
 
                                     {/* Swarm Visualization */}
-                                    {agent.isSwarm && (
-                                        <SwarmGraph active={escrowStatus === 'execution'} step={logs.length} />
-                                    )}
-
-                                    {/* Verification Badge (Success) */}
-                                    {isVerified && (
-                                        <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 mb-4 flex items-center justify-between animate-in zoom-in-95 duration-500">
-                                            <div className="flex items-center gap-3">
-                                                <ShieldCheck className="w-8 h-8 text-green-400" />
-                                                <div>
-                                                    <h3 className="text-sm font-bold text-white">VERIFIABLE COMPUTE PROOF</h3>
-                                                    <div className="text-xs text-green-400/80 font-mono flex flex-col">
-                                                        <span>Hash: 0x{Math.random().toString(16).slice(2, 10)}...</span>
-                                                        <span>Escrow Released: {agent.price} APT</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <Badge variant="outline" className="border-green-500 text-green-400 bg-green-500/10">
-                                                SETTLED
-                                            </Badge>
-                                        </div>
+                                    {agent.isSwarm && logs.length > 0 && (
+                                        <SwarmGraph active={true} step={logs.length} />
                                     )}
 
                                     {/* RICH OUTPUT RENDERER */}
@@ -322,17 +268,9 @@ export default function AgentDetailsPage() {
                                                 </div>
                                             )}
 
-                                            {outputData.type === 'markdown' && (
-                                                <div className="prose prose-invert prose-sm max-w-none font-sans">
-                                                    <pre className="whitespace-pre-wrap font-mono text-xs text-green-300/90 leading-relaxed max-h-[300px] overflow-y-auto custom-scrollbar">
-                                                        {outputData.content}
-                                                    </pre>
-                                                </div>
-                                            )}
-
-                                            {outputData.type === 'text' && (
-                                                <pre className="whitespace-pre-wrap font-mono text-xs text-blue-300/90 leading-relaxed">
-                                                    {outputData.content}
+                                            {(outputData.type === 'audit-report' || outputData.type === 'financial-data' || outputData.type === 'text') && (
+                                                <pre className="whitespace-pre-wrap font-mono text-xs text-green-300/90 leading-relaxed max-h-[300px] overflow-y-auto">
+                                                    {typeof outputData.content === 'string' ? outputData.content : JSON.stringify(outputData.content, null, 2)}
                                                 </pre>
                                             )}
                                         </div>
@@ -340,14 +278,14 @@ export default function AgentDetailsPage() {
 
                                     <div className="space-y-2">
                                         {logs.map((log, i) => (
-                                            <div key={i} className={`flex items-start gap-3 animate-in fade-in slide-in-from-left-2 duration-300`}>
+                                            <div key={i} className="flex items-start gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                                                 <span className="text-xs text-muted-foreground min-w-[80px] pt-0.5">{log.timestamp}</span>
                                                 <div className="flex-1 break-all">
                                                     {log.type === 'info' && <span className="text-blue-400">ℹ {log.message}</span>}
                                                     {log.type === 'success' && <span className="text-green-400 flex items-start gap-1"><CheckCircle className="w-3 h-3 mt-1" /> {log.message}</span>}
                                                     {log.type === 'error' && <span className="text-red-400 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-1" /> {log.message}</span>}
                                                     {log.type === 'warning' && <span className="text-yellow-400">⚠ {log.message}</span>}
-                                                    {log.type === 'escrow' && <span className="text-purple-400 flex items-center gap-1"><Lock className="w-3 h-3" /> {log.message}</span>}
+                                                    {log.type === 'payment' && <span className="text-purple-400 flex items-center gap-1"><Zap className="w-3 h-3 fill-current" /> {log.message}</span>}
                                                 </div>
                                             </div>
                                         ))}
@@ -358,6 +296,18 @@ export default function AgentDetailsPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* x402 Payment Modal */}
+            <PaymentModal
+                isOpen={isPaymentModalOpen}
+                onClose={() => setIsPaymentModalOpen(false)}
+                agentId={agent.id}
+                agentName={agent.name}
+                taskType={taskParams.prompt ? 'image-generation' : taskParams.code ? 'code-audit' : 'financial-analysis'}
+                taskParameters={taskParams}
+                priceAPT={agent.price}
+                onSuccess={handlePaymentSuccess}
+            />
         </div>
     );
 }
