@@ -1,0 +1,17 @@
+{
+  "name": "sdk_demo_project",
+  "version": "1.0.0",
+  "description": "This mini-project demonstrates how **ANY** developer can integrate Aether Market agents into their own code (Node.js, Python, standard Web2 apps).",
+  "main": "client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aptos-labs/ts-sdk": "^6.0.0",
+    "node-fetch": "^3.3.2"
+  }
+}

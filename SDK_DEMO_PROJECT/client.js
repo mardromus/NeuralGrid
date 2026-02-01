@@ -1,28 +1,27 @@
-/**
- * Aether Market - Mini Integration Demo
- * 
- * This script demonstrates how an external developer can call an AI Agent
- * on Aether Market programmatically using the x402 Payment Protocol.
- * 
- * RUNNING THIS:
- * 1. Ensure the Aether Market app is running on localhost:3000
- * 2. Run: node client.js
- */
+const { Aptos, AptosConfig, Network, Account, Ed25519PrivateKey } = require("@aptos-labs/ts-sdk");
 
 const GATEWAY_URL = 'https://neural-grid-iota.vercel.app/api/agent/execute';
-const AGENT_ID = 'atlas-ai'; // We'll use the Text Agent for this demo
+const AGENT_ID = 'atlas-ai';
 
-// Mocking a Crypto Wallet for the demo
-// In a real app, you'd use @aptos-labs/ts-sdk
-const MOCK_WALLET = {
-    address: "0x123...abc",
-    sign: (message) => `0xSigned_${message}_By_User`
-};
+// --- WALLET CONFIGURATION (Wallet 2) ---
+const PRIVATE_KEY_HEX = "0xE53E678AE6D649BDA6735CC0ADFD64CC6EF1D749CCF10F25488706C2C56B0BC1";
+const ACCOUNT_ADDRESS = "0xaaea48900c8f8045876505fe5fc5a623b1e423ef573a55b8b308cdecc749e6f4";
+
+// Setup Aptos SDK
+const config = new AptosConfig({ network: Network.TESTNET });
+const aptos = new Aptos(config);
 
 async function main() {
-    console.log("🚀 Starting Aether SDK Demo...");
+    console.log("🚀 Starting Aether SDK Demo (Real Wallet Mode)...");
     console.log(`🎯 Targeting Agent: ${AGENT_ID}`);
+    console.log(`👛 Caller: ${ACCOUNT_ADDRESS}`);
     console.log("------------------------------------------------");
+
+    // Initialize Account
+    const privateKey = new Ed25519PrivateKey(PRIVATE_KEY_HEX);
+    const account = Account.fromPrivateKey({ privateKey });
+
+    console.log("✅ Wallet Loaded via Private Key");
 
     // 1. Define the Task
     const taskPayload = {
@@ -46,24 +45,53 @@ async function main() {
             const invoice = await response1.json();
             console.log("\n⚠️  402 PAYMENT REQUIRED");
             console.log(`💰 Price: ${invoice.amount} Octas`);
-            console.log(`📫 Pay To: ${invoice.recipient.substring(0, 10)}...`);
+            console.log(`📫 Recipient: ${invoice.recipient}`);
 
-            // 3. "Pay" and Sign
-            // In a real app, we would broadcast an on-chain txn here.
-            // For this demo (Testnet Optimistic), we simulate the signature.
-            console.log("\n🔐 Signing transaction with wallet...");
-            const dummyTxnHash = "0x" + Array(64).fill('a').join('');
-            console.log(`💳 TX Hash generated: ${dummyTxnHash.substring(0, 10)}...`);
+            // 3. Perform REAL On-Chain Payment
+            console.log("\n🔗 Broadcasting Real Transaction to Aptos...");
 
-            // 4. Retry with Payment Header
+            const transaction = await aptos.transaction.build.simple({
+                sender: account.accountAddress,
+                data: {
+                    function: "0x1::aptos_account::transfer",
+                    functionArguments: [invoice.recipient, parseInt(invoice.amount)],
+                },
+            });
+
+            const senderAuthenticator = aptos.transaction.sign({
+                signer: account,
+                transaction,
+            });
+
+            const committedTxn = await aptos.transaction.submit.simple({
+                transaction,
+                senderAuthenticator,
+            });
+
+            console.log(`⏳ Transaction submitted: ${committedTxn.hash}`);
+            console.log("waiting for confirmation...");
+
+            await aptos.waitForTransaction({ transactionHash: committedTxn.hash });
+            console.log("✅ Transaction Confirmed on Chain!");
+
+            // 4. Retry with Payment Proof
             console.log("\n🔄 Retrying with Payment Proof...");
+
+            // Add request ID so server can verify original price/params
+            const retryPayload = { ...taskPayload, requestId: invoice.requestId };
+
             const response2 = await fetch(GATEWAY_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'PAYMENT-SIGNATURE': dummyTxnHash // The x402 Header
+                    'PAYMENT-SIGNATURE': JSON.stringify({
+                        signature: senderAuthenticator.signature.toString(), // Not used for simple verification but good practice
+                        txnHash: committedTxn.hash,
+                        publicKey: account.publicKey.toString(),
+                        timestamp: Date.now()
+                    })
                 },
-                body: JSON.stringify(taskPayload)
+                body: JSON.stringify(retryPayload)
             });
 
             const result = await response2.json();
@@ -74,20 +102,20 @@ async function main() {
                 console.log("🤖 Agent Output:\n");
                 console.log(result.result.response || result);
                 console.log("------------------------------------------------");
+                console.log(`💸 Total Cost: ${result.cost} Octas`);
             } else {
                 console.error("❌ Execution Failed:", result);
             }
 
         } else if (response1.ok) {
-            // Free agent?
             const result = await response1.json();
             console.log("✅ Success (No payment needed):", result);
         } else {
-            console.error("❌ Unexpected Error:", response1.status);
+            console.error("❌ Unexpected Error:", response1.status, response1.statusText);
         }
 
     } catch (error) {
-        console.error("❌ Connection Error. Is the server running at localhost:3000?", error.message);
+        console.error("❌ SDK Error:", error);
     }
 }
 
