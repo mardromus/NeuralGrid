@@ -16,54 +16,36 @@ Aether Market uses the **x402 Protocol**. It's just standard HTTP, but with a cr
 
 ### Prerequisites
 1.  Node.js installed (`v14+`).
-2.  The main **Aether Market** app must be running locally on port `3000`.
-    *   `npm run dev` in the main folder.
-
-### Steps
-1.  Open a terminal in this folder:
-    ```bash
-    cd SDK_DEMO_PROJECT
-    ```
-2.  Run the client script:
-    ```bash
-    node client.js
-    ```
-
-### Expected Output
-You should see the console negotiation happening in real-time:
-```text
-🚀 Starting Aether SDK Demo...
-📡 Sending initial request...
-
-⚠️  402 PAYMENT REQUIRED
-💰 Price: 2000000 Octas
-
-🔐 Signing transaction with wallet...
-🔄 Retrying with Payment Proof...
-
-✅ SUCCESS! Agent Executed.
-🤖 Agent Output: "Decentralized AI ensures censorship resistance and fair monetization..."
-```
+2.  Python installed (for Python example).
 
 ---
 
-## 💻 The Code Explained (See `client.js`)
+### Node.js Example
+1.  Open terminal:
+    ```bash
+    cd SDK_DEMO_PROJECT
+    node client.js
+    ```
 
-The magic happens here:
-```javascript
-// Step 1: Initial Call
-const res1 = await fetch(URL, { body: payload });
+### Python Example
+1.  Ensure you have `requests` installed (`pip install requests`).
+2.  Run:
+    ```bash
+    python client.py
+    ```
 
-// Step 2: Check for 402
-if (res1.status === 402) {
-    
-    // Step 3: Sign Payment (Mocked for demo)
-    const signature = signTransaction(res1.price); 
-    
-    // Step 4: Retry with Header
-    const res2 = await fetch(URL, {
-        headers: { 'PAYMENT-SIGNATURE': signature }, // <--- MAGIC HEADER
-        body: payload
-    });
-}
-```
+---
+
+## ❓ FAQ: "Can I use Google Login in this script?"
+
+**Short Answer: No.** 
+
+**Long Answer:**
+*   **Google Login (Keyless)** is designed for **Humans** using a **Browser**. It requires you to be redirected to `accounts.google.com` to type your password securely. A terminal script cannot do this easily.
+*   **Scripts (Bots)** normally use **Standard Private Keys**.
+
+### The M2M Architecture
+*   **Humans**: Use **Aptos Keyless** (Google) -> "Invisible Wallet".
+*   **Bots/Scripts**: Use **Private Keys** (stored in `.env`) -> "Autonomous Wallet".
+
+If you want this script to *technically* succeed on mainnet, you would export a Private Key from a wallet (like Petra) and use that to sign the transaction in the code.

@@ -27,7 +27,8 @@ export function KeylessWalletSelector() {
         logout,
         createDelegationSession,
         revokeSession,
-        sessionTransactions
+        sessionTransactions,
+        balance // Added
     } = useKeyless();
 
     if (!isAuthenticated || !account) {
@@ -49,7 +50,8 @@ export function KeylessWalletSelector() {
                     variant="outline"
                     className="gap-2 glass-card text-primary hover:bg-primary/20 border-primary/50"
                 >
-                    <Shield className="w-4 h-4" />
+                    <span className="text-yellow-400 font-bold mr-2">{balance} APT</span>
+                    <Shield className="w-4 h-4 ml-1" />
                     {account.address.slice(0, 6)}...{account.address.slice(-4)}
                     {isSessionValid && (
                         <span className="ml-2 px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">
@@ -58,6 +60,7 @@ export function KeylessWalletSelector() {
                     )}
                 </Button>
             </DropdownMenuTrigger>
+
 
             <DropdownMenuContent className="w-64 glass-card border-primary/20">
                 <DropdownMenuLabel className="font-normal">

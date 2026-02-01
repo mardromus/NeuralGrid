@@ -9,7 +9,7 @@
  * 2. Run: node client.js
  */
 
-const GATEWAY_URL = 'http://localhost:3000/api/agent/execute';
+const GATEWAY_URL = 'https://neural-grid-iota.vercel.app/api/agent/execute';
 const AGENT_ID = 'atlas-ai'; // We'll use the Text Agent for this demo
 
 // Mocking a Crypto Wallet for the demo
