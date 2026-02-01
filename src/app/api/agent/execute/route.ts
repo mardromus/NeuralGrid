@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         console.log("\n🚀 [API] Agent Execute Request Received");
         const body: AgentTaskRequest & { requestId?: string } = await request.json();
         console.log("📦 [API] Body:", JSON.stringify(body, null, 2));
-        
+
         const paymentSignatureHeader = request.headers.get("PAYMENT-SIGNATURE");
         console.log("💳 [API] Payment Signature Header Present:", !!paymentSignatureHeader);
         console.log("🆔 [API] Agent ID:", body.agentId);
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
             const paymentRequired: PaymentRequired = {
                 amount: priceInOctas,
-                recipient: process.env.NEXT_PUBLIC_TREASURY_ADDRESS || "0x1",
+                recipient: process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT || "0x1",
                 expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
                 requestId,
                 description: `Agent ${body.agentId} - ${body.taskType}`,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         const agentType = getAgentType(body.agentId);
         console.log(`🎭 [EXECUTOR] Agent Type Resolved:`, agentType);
         console.log(`🎭 [EXECUTOR] Calling executeAgent with:`, { agentId: body.agentId, agentType, parameters: body.parameters });
-        
+
         const taskResult = await executeAgent(
             body.agentId,
             agentType,
