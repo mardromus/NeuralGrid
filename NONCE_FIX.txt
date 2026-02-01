@@ -1,0 +1,30 @@
+// TEMPORARY FIX FILE - Use this to replace login function
+// Copy lines 129-152 into provider.tsx
+
+const login = useCallback(() => {
+    // CRITICAL: Generate ephemeral keypair BEFORE OAuth redirect
+    const ephemeralKeyPair = EphemeralKeyPair.generate();
+    
+    // Serialize and store in sessionStorage
+    const ephemeralKeyPairBytes = ephemeralKeyPair.bcsToBytes();
+    const ephemeralKeyPairHex = Buffer.from(ephemeralKeyPairBytes).toString('hex');
+    sessionStorage.setItem('ephemeral_keypair', ephemeralKeyPairHex);
+    
+    console.log('✅ Ephemeral keypair generated and stored before OAuth');
+    
+    // CRITICAL: Use the ephemeral keypair's NONCE (not a random one!)
+    const nonce = ephemeralKeyPair.nonce;
+    console.log(`🔑 Using ephemeral keypair nonce: ${nonce}`);
+    
+    // Build OAuth URL with ephemeral keypair's nonce
+    const params = new URLSearchParams({
+        client_id: config.googleClientId,
+        redirect_uri: config.redirectUri,
+        response_type: 'id_token',
+        scope: 'openid email profile',
+        nonce,  // THIS IS THE FIX - Use ephemeral keypair's nonce!
+    });
+    
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    window.location.href = authUrl;
+}, [config]);

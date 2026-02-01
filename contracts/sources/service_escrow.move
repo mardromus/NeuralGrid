@@ -15,9 +15,10 @@ module aether_addr::service_escrow {
 
     struct TaskEscrow has key {
         requester: address,
-        provider: address,
+        provider: address, // Agent Object Address
         amount: u64,
         status: u8, // 0: Created, 1: Completed, 2: Disputed
+        result_hash: String, // Proof of Task Hash
         created_at: u64,
     }
 
@@ -29,33 +30,40 @@ module aether_addr::service_escrow {
     ) {
         let requester_addr = signer::address_of(account);
         
-        // Transfer funds to the Module Account (Simplified for hackathon)
-        // In prod, we'd use a resource account
-        // coin::transfer<AptosCoin>(account, @aether_addr, amount);
-
-        // For now, simpler logic: just lock it in a resource under the requester
         move_to(account, TaskEscrow {
             requester: requester_addr,
             provider,
             amount,
             status: 0,
+            result_hash: std::string:: some_empty_string(), // Placeholder
             created_at: timestamp::now_seconds(),
         });
     }
 
     /// Release funds upon completion
     public entry fun complete_task(
-        account: &signer, // Ideally called by requester to confirm
-        task_owner: address 
+        account: &signer,
+        task_owner: address,
+        result_hash: String
     ) acquires TaskEscrow {
         let escrow = borrow_global_mut<TaskEscrow>(task_owner);
         
-        // Logic to transfer coin would go here
-        // coin::transfer...
-
         escrow.status = 1; // Completed
+        escrow.result_hash = result_hash;
 
-        // Update Reputation
+        // Update Reputation using the Provider Object Address
         reputation::update_on_success(escrow.provider, escrow.amount);
+    }
+
+    /// Dispute a task (slashes reputation and potentially stake)
+    public entry fun dispute_task(
+        account: &signer,
+        task_owner: address
+    ) acquires TaskEscrow {
+        let escrow = borrow_global_mut<TaskEscrow>(task_owner);
+        escrow.status = 2; // Disputed
+
+        // Penalty call
+        reputation::update_on_failure(escrow.provider);
     }
 }

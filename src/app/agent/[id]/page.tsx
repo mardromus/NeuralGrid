@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Terminal, CheckCircle, AlertCircle, ArrowLeft, BrainCircuit, ShieldCheck, Zap } from 'lucide-react';
 import Link from 'next/link';
-import { useWallet } from '@aptos-labs/wallet-adapter-react';
+import { useKeyless } from '@/lib/keyless/provider'; // Use Keyless provider
 import { toast } from 'sonner';
 import { SwarmGraph } from '@/components/SwarmGraph';
 import { PaymentModal } from '@/components/PaymentModal';
@@ -24,7 +24,7 @@ interface LogEntry {
 export default function AgentDetailsPage() {
     const params = useParams();
     const { agents } = useAgentStore();
-    const wallet = useWallet();
+    const { isAuthenticated } = useKeyless(); // Use Keyless auth check
     const [agent, setAgent] = useState(agents.find(a => a.id === params.id));
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [outputData, setOutputData] = useState<{ type: string, content: any } | null>(null);
@@ -58,9 +58,9 @@ export default function AgentDetailsPage() {
 
     const handleExecuteAgent = () => {
         if (!agent) return;
-        if (!wallet.connected) {
-            toast.error("Please connect your wallet first");
-            addLog("Execution Aborted: Wallet connection required.", "error");
+        if (!isAuthenticated) {
+            toast.error("Please login with Google first");
+            addLog("Execution Aborted: Authentication required.", "error");
             return;
         }
 
@@ -94,15 +94,15 @@ export default function AgentDetailsPage() {
         addLog(`Cost: ${result.cost} Octas`, "payment");
 
         // Save to transaction history
-        if (result.payment?.transactionHash) {
+        if (result.payment?.transactionHash && agent && typeof params.id === 'string') {
             import("@/lib/x402/history").then(({ saveTransaction }) => {
                 saveTransaction({
                     id: `tx-${Date.now()}`,
                     txnHash: result.payment.transactionHash,
-                    agentId: id,
+                    agentId: params.id as string,
                     agentName: agent.name,
-                    taskType: agent.category,
-                    parameters: {},
+                    taskType: agent.category || "unknown",
+                    parameters: taskParams,
                     cost: result.cost || "0",
                     costAPT: agent.price,
                     result: result.result,

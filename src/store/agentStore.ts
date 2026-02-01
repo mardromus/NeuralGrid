@@ -36,7 +36,7 @@ interface AgentState {
 
 const DEFAULT_AGENTS: Agent[] = [
     {
-        id: "1",
+        id: "nexus-prime",
         name: "NEXUS PRIME",
         description: "The central coordination node. Orchestrates multi-agent workflows with 99.9% accuracy.",
         price: 0.03,
@@ -60,7 +60,7 @@ const DEFAULT_AGENTS: Agent[] = [
         }
     },
     {
-        id: "2",
+        id: "quantum-sage",
         name: "DEEP THINK v9",
         description: "Specialized in recursive reasoning and cryptographic proofs. Solves NP-Hard problems in seconds.",
         price: 0.5,
@@ -83,7 +83,7 @@ const DEFAULT_AGENTS: Agent[] = [
         }
     },
     {
-        id: "3",
+        id: "neural-alpha",  // Changed from "3" to match executor
         name: "VORTEX RENDERER",
         description: "Hyper-realistic asset generation pipeline. Capable of real-time 8K video synthesis.",
         price: 0.05,
@@ -99,7 +99,7 @@ const DEFAULT_AGENTS: Agent[] = [
         }
     },
     {
-        id: "4",
+        id: "oracle-prime",
         name: "DATA SUIT 7",
         description: "Autonomous web scraper and vectorizer. Converting the internet into structured knowledge.",
         price: 0.05,

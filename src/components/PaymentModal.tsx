@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, CheckCircle2, XCircle, Zap, Clock, Shield } from "lucide-react";
 import { X402Client } from "@/lib/x402/client";
 import { PaymentStatus, AgentTaskRequest } from "@/types/x402";
-import { useWallet } from "@aptos-labs/wallet-adapter-react";
+import { useKeyless } from "@/lib/keyless/provider"; // Use Keyless provider instead of Wallet Adapter
 import { Network } from "@aptos-labs/ts-sdk";
 
 interface PaymentModalProps {
@@ -37,15 +37,17 @@ export function PaymentModal({
     priceAPT,
     onSuccess
 }: PaymentModalProps) {
-    const { account, signAndSubmitTransaction } = useWallet();
+    // Use Keyless hook instead of useWallet
+    const { account, isAuthenticated, signWithSession } = useKeyless();
+
     const [status, setStatus] = useState<PaymentStatus>(PaymentStatus.PENDING);
     const [error, setError] = useState<string | null>(null);
     const [txnHash, setTxnHash] = useState<string | null>(null);
     const [result, setResult] = useState<any>(null);
 
     const handleExecuteWithPayment = async () => {
-        if (!account) {
-            setError("Please connect your wallet first");
+        if (!isAuthenticated || !account) {
+            setError("Please login with Google first");
             return;
         }
 
@@ -66,16 +68,11 @@ export function PaymentModal({
 
             const taskResult = await client.executeAgentTask(
                 request,
-                account.address.toString(), // Convert AccountAddress to string
+                account.address, // Keyless account address (string)
                 async (payload) => {
-                    // Petra wallet expects this exact format
-                    const response = await signAndSubmitTransaction({
-                        sender: account.address,
-                        data: {
-                            function: payload.function,
-                            functionArguments: payload.functionArguments
-                        }
-                    });
+                    // Sign with Keyless Autonomous Session!
+                    // This is much smoother - no popup required
+                    const response = await signWithSession(payload);
 
                     if (response.hash) {
                         setTxnHash(response.hash);
@@ -94,7 +91,12 @@ export function PaymentModal({
 
         } catch (err) {
             setStatus(PaymentStatus.FAILED);
-            setError(err instanceof Error ? err.message : "Payment failed");
+            // Handle specific errors like session expiration
+            if (err instanceof Error && err.message.includes("session")) {
+                setError("Session expired. Please refresh autonomous mode.");
+            } else {
+                setError(err instanceof Error ? err.message : "Payment failed");
+            }
         }
     };
 

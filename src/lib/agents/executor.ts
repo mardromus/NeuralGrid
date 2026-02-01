@@ -49,6 +49,10 @@ async function executeImageGeneration(parameters: any): Promise<any> {
             quality: "standard",
         });
 
+        if (!response.data || !response.data[0]) {
+            throw new Error("No image data returned from API");
+        }
+
         return {
             type: "image",
             url: response.data[0].url,
@@ -90,7 +94,7 @@ Provide a JSON response with:
 - strengths: array of good practices found`;
 
         const response = await openai.chat.completions.create({
-            model: "gpt-4-turbo-preview",
+            model: "gpt-4o",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: `\`\`\`${language}\n${code}\n\`\`\`` }
@@ -109,7 +113,7 @@ Provide a JSON response with:
             vulnerabilities: auditResult.vulnerabilities || [],
             suggestions: auditResult.suggestions || [],
             strengths: auditResult.strengths || [],
-            model: "gpt-4-turbo"
+            model: "gpt-4o"
         };
     } catch (error) {
         console.error("Code audit error:", error);
@@ -203,7 +207,7 @@ export async function executeAgent(
                 // Fallback: general AI chat using GPT-4
                 const openai = getOpenAIClient();
                 const response = await openai.chat.completions.create({
-                    model: "gpt-4-turbo-preview",
+                    model: "gpt-4o",
                     messages: [
                         { role: "user", content: parameters.query || "Hello!" }
                     ],
@@ -213,7 +217,7 @@ export async function executeAgent(
                 result = {
                     type: "text",
                     response: response.choices[0].message.content,
-                    model: "gpt-4-turbo"
+                    model: "gpt-4o"
                 };
         }
 

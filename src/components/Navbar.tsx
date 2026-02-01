@@ -1,4 +1,4 @@
-import { WalletSelector } from "./WalletSelector";
+import { KeylessWalletSelector } from "./KeylessWalletSelector";
 import Link from "next/link";
 import { Cpu, LayoutDashboard, FileText, Plus } from "lucide-react"; // Added icons
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ export function Navbar() {
                         <Plus className="w-4 h-4 mr-2" /> MINT AGENT
                     </Button>
                 </Link>
-                <WalletSelector />
+                <KeylessWalletSelector />
             </div>
         </nav>
     );
